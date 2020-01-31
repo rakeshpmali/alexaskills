@@ -61,10 +61,10 @@ const SessionEndedRequestHandler = {
     }
 };
 
-const AreaIntent_Handler =  {
+const CreateAreaIntent_Handler =  {
     canHandle(handlerInput) {
         const request = handlerInput.requestEnvelope.request;
-        return request.type === 'IntentRequest' && request.intent.name === 'AreaIntent' ;
+        return request.type === 'IntentRequest' && request.intent.name === 'CreateAreaIntent' ;
     },
     handle(handlerInput) {
         const request = handlerInput.requestEnvelope.request;
@@ -73,13 +73,15 @@ const AreaIntent_Handler =  {
         var areaName = request.intent.slots.area_name.value;
 
         //let say = 'Creating Area, Please Wait ...';
+        const jsonData = JSON.stringify({"name" : areaName});
         
-        /*var options = {
-            host: '10.127.244.60',
+       /*var options = {
+            host: '49.35.32.92',
             path: '/v1/areas/0',
             port: '52725',
             method: 'POST',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Content-Length': jsonData.length
         };*/
         /*
         var options = {
@@ -87,7 +89,7 @@ const AreaIntent_Handler =  {
             path: '/get',
             method: 'GET',
         };*/
-        const jsonData = JSON.stringify({"name" : areaName});
+        
         
         var options = {
             host: 'httpbin.org',
@@ -104,13 +106,60 @@ const AreaIntent_Handler =  {
                     var respAreaName = JSON.parse(response.data).name
                     console.log('Area Created: ');
                     console.log(areaName);
-                    resolve(handlerInput.responseBuilder.speak(respAreaName + " area created successfully !").getResponse());
+                    resolve(handlerInput.responseBuilder
+                    .speak(respAreaName + " area created successfully !")
+                    .reprompt(respAreaName + " area created successfully !")
+                    .getResponse());
             }).catch((error) => {
                 resolve(handlerInput.responseBuilder.speak('Request Failed !').getResponse());
             });
         });
     },
 };
+
+const CreateZoneIntent_Handler =  {
+    canHandle(handlerInput) {
+        const request = handlerInput.requestEnvelope.request;
+        return request.type === 'IntentRequest' && request.intent.name === 'CreateZoneIntent' ;
+    },
+    handle(handlerInput) {
+        const request = handlerInput.requestEnvelope.request;
+        const responseBuilder = handlerInput.responseBuilder;
+        let sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        var areaName = request.intent.slots.area_name.value;
+        var zoneType = request.intent.slots.zone_type.value;
+        
+        const jsonData = JSON.stringify({"area":{"name" : areaName}, "zone":{"name" : zoneType}});
+        
+        var options = {
+            host: 'httpbin.org',
+            path: '/post',
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Content-Length': jsonData.length
+            },
+        };
+
+        return new Promise((resolve, reject) => {
+                httpRequest(options,jsonData).then((response) => {
+                    var respAreaName = JSON.parse(response.data).area.name
+                    var respZoneName = JSON.parse(response.data).zone.name
+                    console.log('Created Zone: ');
+                    console.log(respZoneName);
+                    console.log('In Area: ');
+                    console.log(respAreaName);
+                    resolve(handlerInput.responseBuilder
+                    .speak(respZoneName + " zone created successfully in " + respAreaName + " area")
+                    .reprompt(respZoneName + " zone created successfully in " + respAreaName + " area")
+                    .getResponse());
+            }).catch((error) => {
+                resolve(handlerInput.responseBuilder.speak('Request Failed !').getResponse());
+            });
+        });
+    },
+};
+
 
 function httpRequest(options, data) {
   return new Promise(((resolve, reject) => {
@@ -119,10 +168,10 @@ function httpRequest(options, data) {
       response.setEncoding('utf8');
       let returnData = '';
 
-        console.log('Request : ');
-        console.log(request);
-        console.log('Response: ');
-        console.log(response);
+        console.log('Request Data : ');
+        console.log(request.data);
+        console.log('Response Data: ');
+        console.log(response.data);
         
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return reject(new Error(`${response.statusCode}: ${response.req.getHeader('host')} ${response.req.path}`));
@@ -154,7 +203,7 @@ function httpRequest(options, data) {
 // It will simply repeat the intent the user said. You can create custom handlers
 // for your intents by defining them above, then also adding them to the request
 // handler chain below.
-const IntentReflectorHandler = {
+/*const IntentReflectorHandler = {
     canHandle(handlerInput) {
         return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest';
     },
@@ -167,8 +216,18 @@ const IntentReflectorHandler = {
             //.reprompt('add a reprompt if you want to keep the session open for the user to respond')
             .getResponse();
     }
-};
+};*/
 
+const SessionEndedHandler =  {
+    canHandle(handlerInput) {
+        const request = handlerInput.requestEnvelope.request;
+        return request.type === 'SessionEndedRequest';
+    },
+    handle(handlerInput) {
+        console.log(`Session ended with reason: ${handlerInput.requestEnvelope.request.reason}`);
+        return handlerInput.responseBuilder.getResponse();
+    }
+};
 // Generic error handling to capture any syntax or routing errors. If you receive an error
 // stating the request handler chain is not found, you have not implemented a handler for
 // the intent being invoked or included it in the skill builder below.
@@ -188,6 +247,46 @@ const ErrorHandler = {
 };
 
 // 3.  Helper Functions ===================================================================
+function getSlotValues(filledSlots) { 
+    const slotValues = {}; 
+ 
+    Object.keys(filledSlots).forEach((item) => { 
+        const name  = filledSlots[item].name; 
+ 
+        if (filledSlots[item] && 
+            filledSlots[item].resolutions && 
+            filledSlots[item].resolutions.resolutionsPerAuthority[0] && 
+            filledSlots[item].resolutions.resolutionsPerAuthority[0].status && 
+            filledSlots[item].resolutions.resolutionsPerAuthority[0].status.code) { 
+            switch (filledSlots[item].resolutions.resolutionsPerAuthority[0].status.code) { 
+                case 'ER_SUCCESS_MATCH': 
+                    slotValues[name] = { 
+                        heardAs: filledSlots[item].value, 
+                        resolved: filledSlots[item].resolutions.resolutionsPerAuthority[0].values[0].value.name, 
+                        ERstatus: 'ER_SUCCESS_MATCH' 
+                    }; 
+                    break; 
+                case 'ER_SUCCESS_NO_MATCH': 
+                    slotValues[name] = { 
+                        heardAs: filledSlots[item].value, 
+                        resolved: '', 
+                        ERstatus: 'ER_SUCCESS_NO_MATCH' 
+                    }; 
+                    break; 
+                default: 
+                    break; 
+            } 
+        } else { 
+            slotValues[name] = { 
+                heardAs: filledSlots[item].value, 
+                resolved: '', 
+                ERstatus: '' 
+            }; 
+        } 
+    }, this); 
+ 
+    return slotValues; 
+} 
 
 function getExampleSlotValues(intentName, slotName) { 
  
@@ -251,8 +350,10 @@ exports.handler = Alexa.SkillBuilders.custom()
         HelpIntentHandler,
         CancelAndStopIntentHandler,
         SessionEndedRequestHandler,
-        AreaIntent_Handler,
-        IntentReflectorHandler, // make sure IntentReflectorHandler is last so it doesn't override your custom intent handlers
+        CreateAreaIntent_Handler,
+        CreateZoneIntent_Handler,
+        //IntentReflectorHandler, // make sure IntentReflectorHandler is last so it doesn't override your custom intent handlers
+        SessionEndedHandler
     )
     .addErrorHandlers(
         ErrorHandler,
@@ -265,7 +366,7 @@ exports.handler = Alexa.SkillBuilders.custom()
 const model = {
   "interactionModel": {
     "languageModel": {
-      "invocationName": "the wavelinx",
+      "invocationName": "wave lexa",
       "intents": [
         {
           "name": "AMAZON.CancelIntent",
@@ -280,7 +381,7 @@ const model = {
           "samples": []
         },
         {
-          "name": "AreaIntent",
+          "name": "CreateAreaIntent",
           "slots": [
             {
               "name": "area_name",
@@ -294,6 +395,22 @@ const model = {
         {
           "name": "AMAZON.NavigateHomeIntent",
           "samples": []
+        },
+        {
+          "name": "CreateZoneIntent",
+          "slots": [
+            {
+              "name": "zone_type",
+              "type": "ZONE_TYPES"
+            },
+            {
+              "name": "area_name",
+              "type": "AREA_NAMES"
+            }
+          ],
+          "samples": [
+            "create {zone_type} zone in area {area_name}"
+          ]
         },
         {
           "name": "LaunchRequest"
@@ -326,6 +443,26 @@ const model = {
             {
               "name": {
                 "value": "Classroom"
+              }
+            }
+          ]
+        },
+        {
+          "name": "ZONE_TYPES",
+          "values": [
+            {
+              "name": {
+                "value": "White Tuning"
+              }
+            },
+            {
+              "name": {
+                "value": "Receptacle"
+              }
+            },
+            {
+              "name": {
+                "value": "Dimmable"
               }
             }
           ]
