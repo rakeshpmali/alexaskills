@@ -14,8 +14,8 @@ config.IOT_THING_NAME           = "optimus-raspi";
 AWS.config.region               = config.IOT_BROKER_REGION;
 //Initializing client for IoT
 var credentials = {
-    accessKeyId : 'AKIAJJ6F3ZOALGTNOK5Q',
-    secretAccessKey : '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'
+    accessKeyId : '<ACCESS_KEY>',
+    secretAccessKey : '<SECRET_KEY>'
 };
 var iotData = new AWS.IotData({endpoint: config.IOT_BROKER_ENDPOINT, credentials : credentials});
 
